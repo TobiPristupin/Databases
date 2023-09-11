@@ -10,4 +10,6 @@ Work for an independent study on the implementation of high performance database
 - key
 - value
 
+As entries are only appended instead of modified, the underlying file can grow indefinitely in size. To combat this, when the file exceeds a certain size the database will "compact" the file by removing duplicate entries.
+
 
