@@ -23,33 +23,33 @@ public:
 
 private:
 
-    struct KeyValueLengths {
-        KeyValueLengths() : dataLength(0), keyLength(0) {};
-        KeyValueLengths(uint32_t dataLength, uint16_t keyLength) : dataLength(dataLength), keyLength(keyLength) {};
-        KeyValueLengths(const KeyValueLengths& keyValueData) = default;
+    struct EntryHeader {
+        EntryHeader() : dataLength(0), keyLength(0), deleted(false) {};
+        EntryHeader(uint32_t dataLength, uint16_t keyLength, bool deleted=false) : dataLength(dataLength), keyLength(keyLength), deleted(deleted) {};
+        EntryHeader(const EntryHeader& entryHeader) = default;
 
         uint32_t keyLength;
         uint32_t dataLength;
+        bool deleted;
     };
 
+    const std::string filename = "log_database.db";
+    size_t fileSizeTriggerCompaction = 2048;
     std::map<std::string, std::streamoff> offset;
     std::fstream file;
-    const std::string filename = "log_database.db";
+
 
     void initializeOffsets();
-    std::optional<KeyValueLengths> readKeyValueLengths();
-    void writeEntry(const KeyValueLengths &keyValueLengths, std::string key, const char* data, std::streamsize size);
+    std::optional<EntryHeader> readEntryHeader();
+    void writeEntry(const EntryHeader &entryHeader, std::string key, const char* data, std::streamsize size);
+    void writeHeader(const EntryHeader &entryHeader);
+    void compactFile();
+    void openFile(bool reset);
     std::string readString(std::streamsize size);
 };
 
 LogDatabase::LogDatabase(bool reset) {
-    auto mode = std::ios::out | std::ios::in | std::ios::binary;
-    if (reset){
-        mode |= std::ios::trunc;
-    } else {
-        mode |= std::ios::app;
-    }
-    file.open(filename, mode);
+    openFile(reset);
     initializeOffsets();
 }
 
@@ -61,8 +61,11 @@ T LogDatabase::get(const std::string &key) {
     }
 
     file.seekg(offset[key], std::ios::beg);
-    auto keyValueLengths = readKeyValueLengths().value();
-    file.seekg(keyValueLengths.keyLength, std::ios::cur);
+    auto entryHeader = readEntryHeader().value();
+    if (entryHeader.deleted){
+        throw std::runtime_error("Key " + key + " does not exist");
+    }
+    file.seekg(entryHeader.keyLength, std::ios::cur);
     T t;
     file.read(reinterpret_cast<char*>(&t), sizeof(T));
     file.seekg(0, std::ios::end);
@@ -76,9 +79,12 @@ std::string LogDatabase::get(const std::string &key) {
     }
 
     file.seekg(offset[key], std::ios::beg);
-    auto keyValueLengths = readKeyValueLengths().value();
-    file.seekg(keyValueLengths.keyLength, std::ios::cur);
-    auto value = readString(keyValueLengths.dataLength);
+    auto entryHeader = readEntryHeader().value();
+    if (entryHeader.deleted){
+        throw std::runtime_error("Key " + key + " does not exist");
+    }
+    file.seekg(entryHeader.keyLength, std::ios::cur);
+    auto value = readString(entryHeader.dataLength);
     file.seekg(0, std::ios::end);
     return value;
 }
@@ -87,15 +93,15 @@ template<typename T>
 void LogDatabase::set(const std::string &key, const T& data) {
     static_assert(std::is_trivially_copyable<T>::value, "Types must be trivially copyable");
     offset[key] = file.tellg();
-    auto keyValueLengths = KeyValueLengths(sizeof(data), key.size());
-    writeEntry(keyValueLengths, key, reinterpret_cast<const char*>(&data), sizeof(data));
+    auto entryHeader = EntryHeader(sizeof(data), key.size());
+    writeEntry(entryHeader, key, reinterpret_cast<const char*>(&data), sizeof(data));
 }
 
 template<>
 void LogDatabase::set<std::string>(const std::string &key, const std::string &data){
     offset[key] = file.tellg();
-    auto keyValueLengths = KeyValueLengths(data.size(), key.size());
-    writeEntry(keyValueLengths, key, data.data(), data.size());
+    auto entryHeader = EntryHeader(data.size(), key.size());
+    writeEntry(entryHeader, key, data.data(), data.size());
 }
 
 bool LogDatabase::contains(const std::string& key) {
@@ -103,33 +109,66 @@ bool LogDatabase::contains(const std::string& key) {
 }
 
 bool LogDatabase::remove(const std::string &key) {
-    return offset.erase(key) > 0;
+    if (!contains(key)){
+        return false;
+    }
+
+    file.seekg(offset[key], std::ios::beg);
+    auto entryHeader = readEntryHeader().value();
+    entryHeader.deleted = true;
+    file.seekg(offset[key], std::ios::beg);
+    writeHeader(entryHeader);
+    offset.erase(key);
+    file.seekg(0, std::ios::end);
+    return true;
 }
 
 void LogDatabase::initializeOffsets() {
     std::streamoff file_pointer = 0;
-    auto keyValueLengths = readKeyValueLengths();
-    while (keyValueLengths.has_value()){
-        auto key = readString(keyValueLengths.value().keyLength);
+    auto entryHeader = readEntryHeader();
+    while (entryHeader.has_value()){
+        auto key = readString(entryHeader.value().keyLength);
         offset[key] = file_pointer;
-        file.seekg(keyValueLengths.value().dataLength, std::ios::cur);
+        file.seekg(entryHeader.value().dataLength, std::ios::cur);
         file_pointer = file.tellg();
-        keyValueLengths = readKeyValueLengths();
+        entryHeader = readEntryHeader();
     }
 }
 
-std::optional<LogDatabase::KeyValueLengths> LogDatabase::readKeyValueLengths() {
-    KeyValueLengths keyValueLengths;
-    if (file.readsome((char*)(&keyValueLengths), sizeof(keyValueLengths))){
-        return keyValueLengths;
+std::optional<LogDatabase::EntryHeader> LogDatabase::readEntryHeader() {
+    EntryHeader entryHeader;
+    if (file.readsome((char*)(&entryHeader), sizeof(entryHeader))){
+        return entryHeader;
     }
     return std::nullopt;
 }
 
-void LogDatabase::writeEntry(const LogDatabase::KeyValueLengths &keyValueLengths, std::string key, const char *data, std::streamsize size) {
-    file.write(reinterpret_cast<const char*>(&keyValueLengths), sizeof(keyValueLengths));
+void LogDatabase::writeEntry(const LogDatabase::EntryHeader &entryHeader, std::string key, const char *data, std::streamsize size) {
+    writeHeader(entryHeader);
     file.write(key.data(), key.size());
     file.write(data, size);
+
+    if (file.tellg() > fileSizeTriggerCompaction){
+        compactFile();
+    }
+}
+
+void LogDatabase::writeHeader(const LogDatabase::EntryHeader &entryHeader) {
+    file.write(reinterpret_cast<const char*>(&entryHeader), sizeof(entryHeader));
+}
+
+void LogDatabase::openFile(bool reset) {
+    auto mode = std::ios::out | std::ios::in | std::ios::binary;
+    if (reset){
+        mode |= std::ios::trunc;
+    } else {
+        mode |= std::ios::app;
+    }
+    file.open(filename, mode);
+}
+
+void LogDatabase::compactFile() {
+    //TODO
 }
 
 std::string LogDatabase::readString(std::streamsize size) {
