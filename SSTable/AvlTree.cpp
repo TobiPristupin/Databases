@@ -1,5 +1,5 @@
-#include <algorithm>
 #include "AvlTree.h"
+
 
 AvlTree::AvlTree() {
     root = nullptr;
@@ -34,7 +34,7 @@ void AvlTree::insert(const Entry &entry) {
         }
     }
 }
-std::optional<DbValue> AvlTree::get(const std::string &key) {
+std::optional<DbValue> AvlTree::get(const std::string &key) const {
     std::optional<Node *> node = findNode(key);
     if (node.has_value()) {
         return node.value()->entry.value;
@@ -43,7 +43,7 @@ std::optional<DbValue> AvlTree::get(const std::string &key) {
     return std::nullopt;
 }
 
-std::optional<AvlTree::Node *> AvlTree::findNode(const std::string &key) {
+std::optional<AvlTree::Node *> AvlTree::findNode(const std::string &key) const {
     auto curr = root.get();
     while (curr) {
         if (key == curr->entry.key) {
@@ -57,28 +57,61 @@ std::optional<AvlTree::Node *> AvlTree::findNode(const std::string &key) {
 
     return std::nullopt;
 }
-std::vector<Entry> AvlTree::toList() {
-    std::vector<Entry> items;
-    std::stack<Node *> stack;
-    auto curr = root.get();
-    while (curr || !stack.empty()) {
-        if (curr) {
-            stack.push(curr);
-            curr = curr->left.get();
-            continue;
-        }
-
-        curr = stack.top();
-        stack.pop();
-        items.push_back(curr->entry);
-        curr = curr->right.get();
-    }
-
-    return items;
-}
 
 bool AvlTree::remove(const std::string &key) {
-    return false;
+    if (!root) {
+        return false;
+    }
+
+    auto curr = &root;
+    auto prev = curr;
+    while (curr) {
+        if (curr->get()->entry.key < key) {
+            prev = curr;
+            curr = &curr->get()->left;
+        } else if (curr->get()->entry.key > key) {
+            prev = curr;
+            curr = &curr->get()->right;
+        } else {
+            break;
+        }
+    }
+
+    if (!curr) {
+        return false;
+    }
+
+    if (!curr->get()->left && !curr->get()->right) {
+
+    }
+
+}
+
+//Node* &AvlTree::findSuccessor(const std::unique_ptr<Node> &node) {
+//    if (!node->right){
+//        throw std::runtime_error("Expected node to have right subtree when searching for successor");
+//    }
+//
+//    auto curr = &node->right;
+//    while (curr->get()->left){
+//        curr = &curr->get()->left;
+//    }
+//
+//    return curr;
+//}
+
+void AvlTree::traverseSorted(const std::function<void(const Entry &)>& callback) const {
+    traverseInorder(callback, root.get());
+}
+
+void AvlTree::traverseInorder(const std::function<void(const Entry &)>& callback, AvlTree::Node *node) const {
+    if (!node){
+        return;
+    }
+
+    traverseInorder(callback, node->left.get());
+    callback(node->entry);
+    traverseInorder(callback, node->right.get());
 }
 
 void AvlTree::clear() {
@@ -88,3 +121,5 @@ void AvlTree::clear() {
 size_t AvlTree::size() const {
     return treeSize;
 }
+
+
