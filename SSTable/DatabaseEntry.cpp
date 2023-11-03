@@ -1,10 +1,8 @@
 #include <stdexcept>
+#include <cstring>
 #include "DatabaseEntry.h"
 
-Entry::Entry(std::string key, DbValue value) : key(std::move(key)), value(std::move(value)) {}
-
-
-std::string Entry::valueToString() const {
+std::string dbValueToString(const DbValue& value) {
     if (const int *v = std::get_if<int>(&value)){
         return std::to_string(*v);
     } else if (const long *v = std::get_if<long>(&value)){
@@ -16,33 +14,38 @@ std::string Entry::valueToString() const {
     } else if (const std::string *v = std::get_if<std::string>(&value)){
         return *v;
     }
+
+    throw std::runtime_error("Unrecognized type index" + std::to_string(value.index()));
 }
 
-Entry::Entry(std::string key, int type_index, const std::string &value) : key(std::move(key)) {
-    switch (type_index) {
-        case 0: {
-            this->value = std::stoi(value);
+DbValue dbValueFromString(size_t typeIndex, const std::string &value) {
+    DbValue dbValue;
+    switch (typeIndex) {
+        case intType: {
+            dbValue = std::stoi(value);
             break;
         }
-        case 1: {
-            this->value = std::stol(value);
+        case longType: {
+            dbValue = std::stol(value);
             break;
         }
-        case 2: {
-            this->value = std::stod(value);
+        case doubleType: {
+            dbValue = std::stod(value);
             break;
         }
-        case 3: {
+        case boolType: {
             if (value != "true" && value != "false"){
                 throw std::runtime_error("Expected boolean type to have value 'true' or 'false'. Instead, it had value " + value);
             }
-            this->value = (value == "true");
+            dbValue = (value == "true");
             break;
         }
-        case 4: {
-            this->value = value;
+        case stringType: {
+            dbValue = value;
             break;
         }
-        default: throw std::runtime_error("Invalid type index " + std::to_string(type_index));
+        default: throw std::runtime_error("Invalid type index " + std::to_string(typeIndex));
     }
+
+    return dbValue;
 }
