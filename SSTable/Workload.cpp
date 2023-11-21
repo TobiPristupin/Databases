@@ -15,21 +15,42 @@ std::vector<Action> WorkloadGenerator::generateRandomWorkload(size_t numActions,
     std::vector<Action> actions;
     actions.reserve(numActions);
     auto keyValues = generateRandomKeyValues(numKeyValuePairs, maxKeySize);
-    std::map<std::string, bool> inserted;
-
     while (actions.size() < numActions){
-        actions.push_back(generateRandomAction(keyValues, inserted));
+        actions.push_back(generateRandomAction(keyValues));
     }
 
     return actions;
 }
 
-Action WorkloadGenerator::generateRandomAction(const std::vector<std::pair<std::string, DbValue>> &keyValuePairs,
-                                               std::map<std::string, bool> &inserted) {
+std::vector<Action>
+WorkloadGenerator::generateCorrectRandomWorkload(size_t numActions, size_t expectedActionsPerKeyValue) {
+    size_t numKeyValuePairs = numActions / expectedActionsPerKeyValue;
+    std::vector<Action> actions;
+    actions.reserve(numActions);
+    auto keyValues = generateRandomKeyValues(numKeyValuePairs, maxKeySize);
+    std::map<std::string, bool> inserted;
+
+    while (actions.size() < numActions){
+        actions.push_back(generateCorrectRandomAction(keyValues, inserted));
+    }
+
+    return actions;
+}
+
+Action WorkloadGenerator::generateRandomAction(const std::vector<std::pair<std::string, DbValue>> &keyValuePairs) {
     std::pair<std::string, DbValue> keyValuePair;
     std::sample(keyValuePairs.begin(), keyValuePairs.end(), &keyValuePair, 1, randomEngine);
     auto operation = randomOperation();
-    while ((operation == Operation::DELETE && !inserted[keyValuePair.first]) || (operation == Operation::INSERT && inserted[keyValuePair.first])){
+    return {operation, keyValuePair.first, keyValuePair.second};
+}
+
+Action WorkloadGenerator::generateCorrectRandomAction(const std::vector<std::pair<std::string, DbValue>> &keyValuePairs,
+                                                      std::map<std::string, bool> &inserted) {
+    std::pair<std::string, DbValue> keyValuePair;
+    std::sample(keyValuePairs.begin(), keyValuePairs.end(), &keyValuePair, 1, randomEngine);
+    auto operation = randomOperation();
+
+    while (!validOperation(operation, inserted[keyValuePair.first])){
         operation = randomOperation();
     }
 
@@ -59,7 +80,7 @@ std::string WorkloadGenerator::randomString(size_t length) {
                 "0123456789"
                 "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                 "abcdefghijklmnopqrstuvwxyz";
-        return charset[randomBetween(1, sizeof(charset)-2);];
+        return charset[randomBetween(1, sizeof(charset)-2)];
     };
 
     std::string str(length,0);
@@ -99,4 +120,16 @@ double WorkloadGenerator::randomBetween(double min, double max) {
     std::uniform_real_distribution<double> uniform(min, max);
     return uniform(randomEngine);
 }
+
+bool WorkloadGenerator::validOperation(const Operation &operation, bool keyInserted) {
+    if (!keyInserted){
+        if (operation == Operation::GET || operation == Operation::DELETE){
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 
