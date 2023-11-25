@@ -8,6 +8,7 @@ std::unique_ptr<SSFile> SSFileCreator::newFile(const std::filesystem::path &dire
                                       const std::unordered_set<std::string> &tombstones) {
     auto filename = fmt::format(fmt::runtime(ssTableFilenameFormat), index);
     std::fstream stream;
+    stream.exceptions(std::ios::badbit | std::ios::failbit);
     stream.open(directory / filename, std::ios::out | std::ios::in | std::ios::trunc | std::ios::binary);
     auto footerStart = writeToFile(&stream, memcache, tombstones);
     return std::make_unique<SSFile>(std::move(stream), index, footerStart);

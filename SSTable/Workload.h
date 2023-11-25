@@ -41,11 +41,12 @@ public:
      */
     std::vector<Action> generateCorrectRandomWorkload(size_t numActions, size_t expectedActionsPerKeyValue);
 
+    std::vector<std::pair<std::string, DbValue>> generateRandomKeyValues(size_t numPairs, size_t maxKeyLength);
+
 private:
     std::default_random_engine randomEngine;
     Action generateRandomAction(const std::vector<std::pair<std::string, DbValue>> &keyValuePairs);
     Action generateCorrectRandomAction(const std::vector<std::pair<std::string, DbValue>> &keyValuePairs, std::map<std::string, bool> &inserted);
-    std::vector<std::pair<std::string, DbValue>> generateRandomKeyValues(size_t numPairs, size_t maxKeyLength);
     std::string randomString(size_t length);
     DbValue randomDbValue();
     Operation randomOperation();

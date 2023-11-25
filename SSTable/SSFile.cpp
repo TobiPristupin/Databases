@@ -66,7 +66,11 @@ SSFile::KeyOffsetPair SSFile::readKeyOffsetPair(size_t fixedKeySize) {
     std::vector<char> key(fixedKeySize, 0);
     file.read(key.data(), fixedKeySize);
     auto str = std::string(key.begin(), key.end());
-    str.resize(str.find_first_of('\00'));
+    auto paddingStart = str.find_first_of('\00');
+    if (paddingStart != std::string::npos){
+        str.resize(paddingStart);
+    }
+
     offset pos;
     file.read(reinterpret_cast<char*>(&pos), sizeof(offset));
     return {str, pos};

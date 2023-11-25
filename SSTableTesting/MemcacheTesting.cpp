@@ -5,7 +5,10 @@
 
 class MemcacheTest : public testing::Test {
 protected:
-    MemcacheTest() : workloadGenerator(seed) {
+    MemcacheTest() {
+        seed = time(nullptr);
+        std::cout << "seed for reproducibility " << std::to_string(seed) << "\n";
+        workloadGenerator = std::make_unique<WorkloadGenerator>(seed);
         initializeMemCache();
     }
 
@@ -18,13 +21,13 @@ protected:
     }
 
     std::unique_ptr<DbMemCache> memCache;
-    WorkloadGenerator workloadGenerator;
-    static const unsigned int seed = 1;
+    std::unique_ptr<WorkloadGenerator> workloadGenerator;
+    unsigned int seed;
 };
 
 TEST_F(MemcacheTest, testCorrectness){
     std::map<std::string, DbValue> mirror;
-    auto workload = workloadGenerator.generateRandomWorkload(50, 10);
+    auto workload = workloadGenerator->generateRandomWorkload(5000, 20);
     for (auto &action : workload){
         ASSERT_EQ(mirror.size(), memCache->size());
         switch (action.operation) {
@@ -50,7 +53,7 @@ TEST_F(MemcacheTest, testCorrectness){
 
 TEST_F(MemcacheTest, testTraverseSorted){
     std::map<std::string, DbValue> mirror;
-    auto workload = workloadGenerator.generateRandomWorkload(50, 10);
+    auto workload = workloadGenerator->generateRandomWorkload(5000, 20);
     for (auto &action : workload){
         switch (action.operation) {
             case Operation::INSERT:
@@ -65,7 +68,7 @@ TEST_F(MemcacheTest, testTraverseSorted){
     }
 
     auto it = mirror.begin();
-    memCache->traverseSorted([&it](auto key, auto value) {
+    memCache->traverseSorted([this, &it](auto key, auto value) {
         ASSERT_EQ(it->first, key);
         ASSERT_EQ(it->second, value);
         ++it;

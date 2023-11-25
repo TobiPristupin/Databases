@@ -87,8 +87,14 @@ bool AvlTree<K, V>::remove(const K &key) {
         return false;
     }
 
+    auto newRoot = removeRecursive(root.value(), key);
     treeSize--;
-    removeRecursive(root.value(), key);
+    if (newRoot){
+        root = newRoot;
+    } else {
+        root = std::nullopt;
+    }
+
     return true;
 }
 
