@@ -1,9 +1,8 @@
 #include <gtest/gtest.h>
-#include "../SSTable/DatabaseEntry.h"
+#include "../DatabaseEntry.h"
 #include "../SSTable/AvlTree.hpp"
 #include "../SSTable/SSFileCreator.h"
-#include "../SSTable/SSFile.h"
-#include "../SSTable/Workload.h"
+#include "../Workload.h"
 
 class SSFileTest : public testing::Test {
 protected:

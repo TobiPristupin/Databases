@@ -4,10 +4,11 @@
 #include <filesystem>
 #include <fstream>
 #include <unordered_set>
-#include "DatabaseEntry.h"
+#include "../DatabaseEntry.h"
 #include <regex>
 #include "MemCache.h"
 #include "SSFile.h"
+#include "DbMemCache.h"
 
 
 class SSFileCreator {

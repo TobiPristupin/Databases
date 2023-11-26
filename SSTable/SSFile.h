@@ -5,7 +5,8 @@
 #include <ios>
 #include <vector>
 #include <fstream>
-#include "DatabaseEntry.h"
+#include <optional>
+#include "../DatabaseEntry.h"
 
 class SSFile {
 public:
@@ -14,7 +15,7 @@ public:
 
     struct ValueHeader {
         ValueHeader();
-        ValueHeader(uint32_t dataLength, uint32_t typeIndex);
+        ValueHeader(uint32_t dataLength, DbValueTypeIndex typeIndex);
         bool isEntryRemoved() const;
 
         /*
@@ -27,7 +28,7 @@ public:
         /*
          * Corresponds to the type index of DbValue's variant type
          */
-        size_t typeIndex;
+        DbValueTypeIndex typeIndex;
     };
 
     struct KeyChunkHeader {

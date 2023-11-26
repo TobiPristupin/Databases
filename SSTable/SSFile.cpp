@@ -89,7 +89,7 @@ DbValue SSFile::readValue() {
     return dbValueFromString(header.typeIndex, std::string(data.begin(), data.end()));
 }
 
-SSFile::ValueHeader::ValueHeader(uint32_t dataLength, uint32_t typeIndex) : dataLength(dataLength), typeIndex(typeIndex) {}
+SSFile::ValueHeader::ValueHeader(uint32_t dataLength, DbValueTypeIndex typeIndex) : dataLength(dataLength), typeIndex(typeIndex) {}
 
 SSFile::ValueHeader::ValueHeader() : dataLength(0), typeIndex(0) {}
 

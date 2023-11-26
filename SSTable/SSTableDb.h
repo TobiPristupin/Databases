@@ -3,7 +3,7 @@
 
 #include <fstream>
 #include <unordered_set>
-#include "DatabaseEntry.h"
+#include "../DatabaseEntry.h"
 #include "MemCache.h"
 #include "AvlTree.hpp"
 #include "SSFileCreator.h"

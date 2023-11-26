@@ -20,53 +20,67 @@ FetchContent_MakeAvailable(fmt)
 FetchContent_MakeAvailable(googletest)
 
 add_library(csv INTERFACE
-        SSTableTesting/MemcacheTesting.cpp)
+        SSTableTesting/MemcacheTesting.cpp
+        LogDatabaseTesting/LogDatabaseTest.cpp)
+
 target_include_directories(csv INTERFACE lib/csv)
 
-add_executable(SSTable SSTable/main.cpp
+set (LOG_DATABASE_FILES
+        LogDatabase/LogDatabaseGenerics.hpp
+        LogDatabase/LogDatabase.h
+        LogDatabase/LogDatabase.cpp)
+
+set (SSTABLE_FILES
         SSTable/MemCache.h
         SSTable/SSTableDb.h
-        SSTable/DatabaseEntry.h
         SSTable/SSFileCreator.cpp
         SSTable/SSFileCreator.h
         SSTable/SSTableDb.cpp
-        SSTable/DatabaseEntry.cpp
         SSTable/AvlTree.hpp
         SSTable/SSFile.cpp
         SSTable/SSFile.h
-        SSTable/Workload.h
-        SSTable/Workload.cpp)
+        SSTable/DbMemCache.h)
 
-add_executable(LogDatabase LogDatabase/main.cpp
-        LogDatabase/LogDatabase.h)
+set (SHARED_FILES
+        Workload.h
+        Workload.cpp
+        DatabaseEntry.h
+        DatabaseEntry.cpp
+)
 
-target_link_libraries(SSTable
+add_executable(Databases
+        ${LOG_DATABASE_FILES}
+        ${SSTABLE_FILES}
+        ${SHARED_FILES}
+        main.cpp
+        SSTable/DbMemCache.h)
+
+target_link_libraries(Databases
         PRIVATE
         fmt::fmt-header-only
         csv)
+
 add_executable(scratchwork test.cpp)
 
 enable_testing()
 
 add_executable(
         SSTableTesting
+        ${SSTABLE_FILES}
+        ${SHARED_FILES}
         SSTableTesting/SSFileTest.cpp
         SSTableTesting/MemcacheTesting.cpp
-        SSTable/MemCache.h
-        SSTable/SSTableDb.h
-        SSTable/DatabaseEntry.h
-        SSTable/SSFileCreator.cpp
-        SSTable/SSFileCreator.h
-        SSTable/SSTableDb.cpp
-        SSTable/DatabaseEntry.cpp
-        SSTable/AvlTree.hpp
-        SSTable/SSFile.cpp
-        SSTable/SSFile.h
         SSTableTesting/TestUtils.cpp
         SSTableTesting/TestUtils.h
-        SSTable/Workload.h
-        SSTable/Workload.cpp
 )
+
+add_executable(
+        LogDatabaseTesting
+        ${LOG_DATABASE_FILES}
+        ${SHARED_FILES}
+        LogDatabaseTesting/LogDatabaseTest.cpp
+)
+
 
 target_link_libraries(
         SSTableTesting
@@ -76,5 +90,12 @@ target_link_libraries(
         csv
 )
 
+target_link_libraries(
+        LogDatabaseTesting
+        PRIVATE
+        GTest::gtest_main
+)
+
 include(GoogleTest)
 gtest_discover_tests(SSTableTesting)
+gtest_discover_tests(LogDatabaseTesting)

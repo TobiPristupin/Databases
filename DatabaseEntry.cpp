@@ -1,5 +1,4 @@
 #include <stdexcept>
-#include <cstring>
 #include "DatabaseEntry.h"
 
 std::string dbValueToString(const DbValue& value) {
@@ -18,7 +17,7 @@ std::string dbValueToString(const DbValue& value) {
     throw std::runtime_error("Unrecognized type index" + std::to_string(value.index()));
 }
 
-DbValue dbValueFromString(size_t typeIndex, const std::string &value) {
+DbValue dbValueFromString(DbValueTypeIndex typeIndex, const std::string &value) {
     DbValue dbValue;
     switch (typeIndex) {
         case intType: {

@@ -1,7 +1,8 @@
 #include <gtest/gtest.h>
-#include "../SSTable/DatabaseEntry.h"
+#include "../DatabaseEntry.h"
 #include "../SSTable/AvlTree.hpp"
-#include "../SSTable/Workload.h"
+#include "../Workload.h"
+#include "../SSTable/DbMemCache.h"
 
 class MemcacheTest : public testing::Test {
 protected:

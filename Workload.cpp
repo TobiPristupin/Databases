@@ -5,6 +5,8 @@
 #include <random>
 #include <stdexcept>
 #include <iostream>
+#include <vector>
+#include <algorithm>
 
 Action::Action(Operation operation, std::string key, DbValue value) : operation(operation), key(std::move(key)), value(std::move(value)) {}
 
