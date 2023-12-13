@@ -13,8 +13,18 @@ public:
 
     using offset = std::streamoff;
 
+    struct SSFileHeader {
+        SSFileHeader() = default;
+        SSFileHeader(uint32_t index, uint32_t hasBloomFilter, uint32_t bloomFilterLength, uint32_t footerStart);
+
+        uint32_t index;
+        uint32_t hasBloomFilter;
+        uint32_t bloomFilterLength;
+        uint32_t keyFooterStart;
+    };
+
     struct ValueHeader {
-        ValueHeader();
+        ValueHeader() = default;
         ValueHeader(uint32_t dataLength, DbValueTypeIndex typeIndex);
         bool isEntryRemoved() const;
 
@@ -32,17 +42,15 @@ public:
     };
 
     struct KeyChunkHeader {
-        KeyChunkHeader();
+        KeyChunkHeader() = default;
         KeyChunkHeader(uint32_t fixedKeySize, uint32_t chunkLength);
 
-        uint32_t getFixedKeySize() const;
-        uint32_t getLength() const;
-        size_t keyOffsetPairLength() const;
-        size_t getNumKeysInChunk() const;
 
-    private:
         uint32_t fixedKeySize;
         uint32_t length;
+
+        size_t keyOffsetPairLength() const;
+        size_t getNumKeysInChunk() const;
     };
 
     struct KeyOffsetPair {
@@ -52,16 +60,16 @@ public:
         offset pos;
     };
 
-    SSFile(std::fstream file, size_t index, offset keyFooterStart);
+    SSFile(std::fstream file);
     std::optional<DbValue> get(const std::string &key);
     size_t getIndex() const;
 
 private:
 
     std::fstream file;
-    SSFile::offset keyFooterStart;
-    size_t index;
+    SSFileHeader header{};
 
+    SSFileHeader readSSFileHeader();
     KeyChunkHeader moveToChunkForKey(const std::string &key);
     KeyChunkHeader readKeyChunkHeader();
     std::optional<offset> findValueOffset(offset chunkStart, KeyChunkHeader chunkHeader, const std::string &key);

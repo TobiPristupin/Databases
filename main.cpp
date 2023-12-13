@@ -1,28 +1,10 @@
-//#include <iostream>
-//#include "LogDatabase.h"
-//
-//int main() {
-////    LogDatabase database(true);
-////    database.set<int>("key_1", 1);
-////    database.set<std::string>("keyy_2", "putoloco");
-////    database.set("key_3", 1234);
-////    std::cout << database.get<int>("key_3") << "\n";
-////    std::cout << database.get<int>("key_1") << "\n";
-////    std::cout << database.get<std::string>("keyy_2") << "\n";
-////    database.remove("key_3");
-//
-//    LogDatabase database;
-//    std::cout << database.get<int>("key_1") << "\n";
-//    std::cout << database.get<std::string>("keyy_2") << "\n";
-//    std::cout << database.get<int>("key_3") << "\n";
-//    return 0;
-//}
-
 #include <iostream>
+#include <benchmark/benchmark.h>
 #include "SSTable/MemCache.h"
 #include "SSTable/SSTableDb.h"
 #include "LogDatabase/LogDatabase.h"
 #include "Workload.h"
+#include "SSTable/SSTableParams.h"
 /*
  * Ideas for benchmarking
  *
@@ -34,34 +16,97 @@
  *  same sequence of reads to each and determine the time difference.
  */
 
+static const unsigned long seed = 1;
 
-int main(){
-//    SSTableDb db(std::make_unique<);
-//    std::unique_ptr<DbMemCache> memCache = std::make_unique<AvlTree<std::string, DbValue>>();
-//    memCache->insert("hola", 123.1);
-//    memCache->insert("caca", INT64_MAX);
-//    memCache->insert("llavelarga", 1.1);
-//    memCache->insert("llavelarga1", 1.2);
-//    memCache->insert("llavelarga2", 1.3);
-//    memCache->insert("llavelarga3", 1.4);
-//    memCache->insert("llavelarga4", 1.5);
-//    memCache->insert("1", "cacorruti");
-//    auto ssfile = SSFileCreator::newFile(std::filesystem::path{"."}, 1, memCache.get(), {});
-//    std::cout << dbValueToString(ssfile->get("1").value()) << "\n";
-
-    unsigned long seed = 1;
-    WorkloadGenerator workloadGenerator(seed);
-    auto workload = workloadGenerator.generateRandomWorkload(50, 5);
-    auto database = LogDatabase(true);
-    database.insert("hola", 1.253);
-    database.insert("caca", "pene");
-    database.remove("hola");
-    database.insert("ser", "puto");
-    database.insert("bool", false);
-    database.insert("bool", false);
-    std::cout << database.get("hola").has_value() << "\n";
-    std::cout << dbValueToString(database.get("caca").value()) << "\n";
-    std::cout << dbValueToString(database.get("ser").value()) << "\n";
-    std::cout << dbValueToString(database.get("bool").value()) << "\n";
-    return 0;
+static void processAction(const Action& action, SSTableDb& ssTableDb){
+    switch (action.operation) {
+        case Operation::GET:
+            ssTableDb.get(action.key);
+            break;
+        case Operation::INSERT:
+            ssTableDb.insert(action.key, action.value);
+            break;
+        case Operation::DELETE:
+            ssTableDb.remove(action.key);
+            break;
+    }
 }
+
+static void processAction(const Action& action, LogDatabase& logDatabase){
+    switch (action.operation) {
+        case Operation::GET:
+            logDatabase.get(action.key);
+            break;
+        case Operation::INSERT:
+            logDatabase.insert(action.key, action.value);
+            break;
+        case Operation::DELETE:
+            logDatabase.remove(action.key);
+            break;
+    }
+}
+
+static void random_workload_log_database(benchmark::State& state){
+    WorkloadGenerator workloadGenerator(seed, maxKeySize);
+    for (auto _ : state){
+        auto workload = workloadGenerator.generateRandomWorkload(100000, 1);
+        LogDatabase logDatabase(true);
+        for (const auto &action : workload){
+            processAction(action, logDatabase);
+        }
+    }
+}
+
+static void random_workload_sstable(benchmark::State& state){
+    WorkloadGenerator workloadGenerator(seed, maxKeySize);
+    for (auto _ : state){
+        auto workload = workloadGenerator.generateRandomWorkload(100000, 1);
+        std::unique_ptr<DbMemCache> memCache(new BST<std::string, DbValue>);
+        SSTableDb ssTableDb(std::move(memCache), "/home/pristu/Documents/School/DataIntensive/SSTable", true);
+        for (const auto &action : workload){
+            processAction(action, ssTableDb);
+        }
+    }
+}
+
+static void only_inserts_log_database(benchmark::State& state){
+    WorkloadGenerator workloadGenerator(seed, maxKeySize);
+    for (auto _ : state){
+        auto workload = workloadGenerator.onlyInsertsWorkload(50000);
+        LogDatabase logDatabase(true);
+        for (const auto &action : workload){
+            processAction(action, logDatabase);
+        }
+    }
+}
+
+static void only_inserts_sstable(benchmark::State& state){
+    WorkloadGenerator workloadGenerator(seed, maxKeySize);
+    for (auto _ : state){
+        auto workload = workloadGenerator.onlyInsertsWorkload(50000);
+        std::unique_ptr<DbMemCache> memCache(new BST<std::string, DbValue>);
+        SSTableDb ssTableDb(std::move(memCache), "/home/pristu/Documents/School/DataIntensive/SSTable", true);
+        for (const auto &action : workload){
+            processAction(action, ssTableDb);
+        }
+    }
+}
+
+// TODO: refactor benchmarks to take a database interface instead of having a benchmark per database
+// TODO: use a benchmark fixture to avoid setting up workload generator each benchmark?
+BENCHMARK(random_workload_log_database);
+BENCHMARK(random_workload_sstable);
+BENCHMARK(only_inserts_log_database);
+BENCHMARK(only_inserts_sstable);
+
+
+BENCHMARK_MAIN();
+
+/*
+ * TODO
+ * If expected actions per key value is high, we end up deleting too much. Need to bias towards getting and inserting.
+ *
+ * Add SSfile header, read index from header instead of filename
+ * add bloom filter
+ *
+ */

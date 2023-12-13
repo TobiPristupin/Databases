@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "../LogDatabase/LogDatabase.h"
-#include "../SSTable/AvlTree.hpp"
+#include "../SSTable/BST.hpp"
 #include "../Workload.h"
 
 class LogDatabaseTest : public testing::Test {
@@ -34,8 +34,6 @@ TEST_F(LogDatabaseTest, testCorrectness){
                 break;
             case Operation::DELETE:
                 ASSERT_EQ(mirror.erase(action.key) >= 1, database.remove(action.key));
-                break;
-            case Operation::ENUM_COUNT:
                 break;
         }
     }

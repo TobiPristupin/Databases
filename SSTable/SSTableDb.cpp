@@ -4,18 +4,21 @@
 #include <algorithm>
 #include "csv.hpp"
 
-SSTableDb::SSTableDb(std::unique_ptr<DbMemCache> memCache, const std::filesystem::path& directory) : memcache(std::move(memCache)), baseDirectory(directory){
+SSTableDb::SSTableDb(std::unique_ptr<DbMemCache> memCache, const std::filesystem::path& directory, bool reset, bool useBloomFilter)
+: memcache(std::move(memCache)), baseDirectory(directory), useBloomFilter(useBloomFilter){
     if (!is_directory(directory)){
         throw std::runtime_error("Expected directory, received" + directory.string());
     }
 
-    openWriteAheadLog();
+    openWriteAheadLog(reset);
     writeAheadLogWriter = std::make_unique<csv::CSVWriter<std::fstream>>(writeAheadLog);
     populateMemcacheFromLog();
-    populateSSTables();
+    if (!reset){
+        populateSSTables();
+    }
 }
 
-void SSTableDb::set(const std::string &key, const DbValue& value) {
+void SSTableDb::insert(const std::string &key, const DbValue& value) {
     validateKey(key);
     tombstones.erase(key);
     writeEntryToLog(key, value);
@@ -35,8 +38,8 @@ std::optional<DbValue> SSTableDb::get(const std::string &key) {
         return cached.value();
     }
 
-    for (const auto& ssTable : ssTableFiles){
-        auto value = ssTable->get(key);
+    for (auto it = ssTableFiles.rbegin(); it != ssTableFiles.rend(); it++){
+        auto value = (*it)->get(key);
         if (value.has_value()){
             return value.value();
         }
@@ -53,7 +56,12 @@ void SSTableDb::remove(const std::string &key) {
 }
 
 void SSTableDb::flushMemcache() {
-    auto file = SSFileCreator::newFile(baseDirectory / ssTablesDirectory, ssTableFiles.size(), memcache.get(), tombstones);
+    if (memcache->size() == 0){
+        return;
+    }
+
+    auto newIndex = ssTableFiles.size();
+    auto file = SSFileCreator::newFile(baseDirectory / ssTablesDirectory, newIndex, useBloomFilter, bloomFilterBits, memcache.get(), tombstones);
     ssTableFiles.push_back(std::move(file));
     memcache->clear();
     clearWriteAheadLog();

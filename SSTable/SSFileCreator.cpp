@@ -4,27 +4,30 @@
 #include "fmt/format.h"
 
 
-std::unique_ptr<SSFile> SSFileCreator::newFile(const std::filesystem::path &directory, size_t index, const DbMemCache *memcache,
-                                      const std::unordered_set<std::string> &tombstones) {
+std::unique_ptr<SSFile> SSFileCreator::newFile(const std::filesystem::path &directory, size_t index,
+                                               bool hasBloomFilter, uint32_t bloomFilterSize,
+                                               const DbMemCache *memcache,  const std::unordered_set<std::string> &tombstones) {
     auto filename = fmt::format(fmt::runtime(ssTableFilenameFormat), index);
     std::fstream stream;
     stream.exceptions(std::ios::badbit | std::ios::failbit);
+    auto dir = directory / filename;
     stream.open(directory / filename, std::ios::out | std::ios::in | std::ios::trunc | std::ios::binary);
+    auto headerStart = writePlaceHolderSSFileHeader(&stream);
     auto footerStart = writeToFile(&stream, memcache, tombstones);
-    return std::make_unique<SSFile>(std::move(stream), index, footerStart);
+    modifySSFileHeader(&stream, headerStart, SSFileHeader(index, hasBloomFilter, bloomFilterSize, footerStart));
+    stream.seekg(0);
+    return std::make_unique<SSFile>(std::move(stream));
 }
 
 std::unique_ptr<SSFile> SSFileCreator::loadFile(const std::filesystem::path &file) {
+    //TODO: FIX
     if (!isFilenameSSTable(file)){
         throw std::runtime_error("File " + file.string() + " is not a valid SSTable file");
     }
 
-    auto index = SSFileCreator::extractIndexFromFilename(file);
     std::fstream stream;
     stream.open(file, std::ios::in | std::ios::binary);
-    auto footerSize = findFooterSize(&stream);
-    auto footerStart = findFooterStart(&stream, footerSize);
-    return std::make_unique<SSFile>(std::move(stream), index, footerStart);
+    return std::make_unique<SSFile>(std::move(stream));
 }
 
 SSFileCreator::offset SSFileCreator::writeToFile(std::fstream *stream, const DbMemCache *memcache,
@@ -32,8 +35,6 @@ SSFileCreator::offset SSFileCreator::writeToFile(std::fstream *stream, const DbM
     auto valueOffsets = writeValues(stream, memcache, tombstones);
     auto keysBySize = groupByChunkKeySize(memcache);
     offset footerStart = writeKeyChunks(stream, keysBySize, valueOffsets);
-    offset footerSize = stream->tellg() - footerStart;
-    stream->write(reinterpret_cast<const char*>(&footerSize), sizeof(footerSize));
     return footerStart;
 }
 
@@ -78,18 +79,6 @@ SSFileCreator::KeysBySize SSFileCreator::groupByChunkKeySize(const DbMemCache *m
     return groups;
 }
 
-size_t SSFileCreator::extractIndexFromFilename(const std::filesystem::path &path) {
-    std::smatch matchResults;
-    std::string filename = path.filename().string();
-    if (std::regex_match(filename, matchResults, ssTableFilenameRegex)){
-        if (matchResults.size() >= 2){
-            return std::stoi(matchResults[1].str());
-        }
-    }
-
-    throw std::runtime_error("Attempted to extract index from invalid filename: " + filename + ". Is this an SSTable file?");
-}
-
 bool SSFileCreator::isFilenameSSTable(const std::filesystem::path &path) {
     return std::regex_match(path.filename().string(), ssTableFilenameRegex);
 }
@@ -104,6 +93,21 @@ SSFileCreator::offset SSFileCreator::writeValue(std::fstream *stream, const Valu
     auto str = dbValueToString(value);
     stream->write(str.data(), str.size());
     return offset;
+}
+
+SSFileCreator::offset SSFileCreator::writePlaceHolderSSFileHeader(std::fstream* stream) {
+    auto offset = stream->tellg();
+    SSFileHeader header{};
+    stream->write(reinterpret_cast<const char*>(&header), sizeof(header));
+    return offset;
+}
+
+void SSFileCreator::modifySSFileHeader(std::fstream *stream, SSFileCreator::offset headerPos,
+                                       const SSFileCreator::SSFileHeader &header) {
+    auto oldOffset = stream->tellg();
+    stream->seekg(headerPos);
+    stream->write(reinterpret_cast<const char*>(&header), sizeof(header));
+    stream->seekg(oldOffset);
 }
 
 SSFileCreator::offset SSFileCreator::writeValueHeader(std::fstream* stream, const ValueHeader &valueHeader) {
@@ -136,29 +140,4 @@ size_t SSFileCreator::findChunkKeySize(const std::string &key) {
     }
 
     return chunkKeySizes[i];
-}
-
-SSFileCreator::offset SSFileCreator::findFooterStart(std::fstream *stream, offset footerSize) {
-    auto offsetPrev = stream->tellg();
-    auto footerStart = fileSize(stream) - footerSize;
-    stream->seekg(offsetPrev);
-    return footerStart;
-}
-
-SSFileCreator::offset SSFileCreator::findFooterSize(std::fstream *stream) {
-    auto offsetPrev = stream->tellg();
-    offset footerSize = 0;
-    stream->seekg(- (int) sizeof(footerSize), std::ios::end);
-    stream->read(reinterpret_cast<char*>(&footerSize), sizeof(footerSize));
-    footerSize += sizeof(footerSize);
-    stream->seekg(offsetPrev);
-    return footerSize;
-}
-
-SSFileCreator::offset SSFileCreator::fileSize(std::fstream *stream) {
-    auto offsetPrev = stream->tellg();
-    stream->seekg(0, std::ios::end);
-    auto fileSize = stream->tellg();
-    stream->seekg(offsetPrev);
-    return fileSize;
 }

@@ -1,15 +1,16 @@
 #include <gtest/gtest.h>
 #include "../DatabaseEntry.h"
-#include "../SSTable/AvlTree.hpp"
+#include "../SSTable/BST.hpp"
 #include "../Workload.h"
 #include "../SSTable/DbMemCache.h"
+#include "../SSTable/SSTableParams.h"
 
 class MemcacheTest : public testing::Test {
 protected:
     MemcacheTest() {
         seed = time(nullptr);
         std::cout << "seed for reproducibility " << std::to_string(seed) << "\n";
-        workloadGenerator = std::make_unique<WorkloadGenerator>(seed);
+        workloadGenerator = std::make_unique<WorkloadGenerator>(seed, maxKeySize);
         initializeMemCache();
     }
 
@@ -18,7 +19,7 @@ protected:
     }
 
     void initializeMemCache(){
-        memCache = std::make_unique<AvlTree<std::string, DbValue>>();
+        memCache = std::make_unique<BST<std::string, DbValue>>();
     }
 
     std::unique_ptr<DbMemCache> memCache;
@@ -46,8 +47,6 @@ TEST_F(MemcacheTest, testCorrectness){
             case Operation::DELETE:
                 ASSERT_EQ(mirror.erase(action.key) >= 1, memCache->remove(action.key));
                 break;
-            case Operation::ENUM_COUNT:
-                break;
         }
     }
 }
@@ -63,7 +62,6 @@ TEST_F(MemcacheTest, testTraverseSorted){
                 break;
             case Operation::GET:
             case Operation::DELETE:
-            case Operation::ENUM_COUNT:
                 break;
         }
     }

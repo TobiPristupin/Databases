@@ -5,14 +5,14 @@
 #include <unordered_set>
 #include "../DatabaseEntry.h"
 #include "MemCache.h"
-#include "AvlTree.hpp"
+#include "BST.hpp"
 #include "SSFileCreator.h"
 #include "csv.hpp"
 
 class SSTableDb {
 public:
-    explicit SSTableDb(std::unique_ptr<DbMemCache> memCache, const std::filesystem::path& directory = ".");
-    void set(const std::string &key, const DbValue& value);
+    explicit SSTableDb(std::unique_ptr<DbMemCache> memCache, const std::filesystem::path& directory = ".", bool reset=false, bool useBloomFilter=false);
+    void insert(const std::string &key, const DbValue& value);
     std::optional<DbValue> get(const std::string &key);
     void remove(const std::string &key);
     ~SSTableDb();
@@ -20,8 +20,8 @@ public:
 private:
     std::filesystem::path baseDirectory;
     std::unique_ptr<DbMemCache> memcache;
-    const size_t maxMemcacheSize = 1024;
     std::unordered_set<std::string> tombstones;
+    bool useBloomFilter;
     const std::filesystem::path writeAheadLogFilename = "write_ahead_log.csv";
     const std::filesystem::path ssTablesDirectory = "sstables";
     std::fstream writeAheadLog;

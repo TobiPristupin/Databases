@@ -2,11 +2,8 @@
 #include <utility>
 #include <iostream>
 
-SSFile::SSFile(std::fstream file, size_t index, offset keyFooterStart)
-        : file(std::move(file)), index(index), keyFooterStart(keyFooterStart) {}
-
-size_t SSFile::getIndex() const {
-    return index;
+SSFile::SSFile(std::fstream file) : file(std::move(file)) {
+    header = readSSFileHeader();
 }
 
 std::optional<DbValue> SSFile::get(const std::string &key) {
@@ -21,13 +18,17 @@ std::optional<DbValue> SSFile::get(const std::string &key) {
     return readValue();
 }
 
+size_t SSFile::getIndex() const {
+    return header.index;
+}
+
 std::optional<SSFile::offset> SSFile::findValueOffset(SSFile::offset chunkStart, SSFile::KeyChunkHeader chunkHeader, const std::string &key) {
-    auto lo = 0;
-    auto hi = chunkHeader.getNumKeysInChunk() - 1;
-    auto mid = lo + ((hi - lo) / 2);
+    int lo = 0;
+    int hi = static_cast<int>(chunkHeader.getNumKeysInChunk() - 1);
+    int mid = lo + ((hi - lo) / 2);
     while (lo <= hi){
         file.seekg(chunkStart + mid * chunkHeader.keyOffsetPairLength());
-        auto keyOffsetPair = readKeyOffsetPair(chunkHeader.getFixedKeySize());
+        auto keyOffsetPair = readKeyOffsetPair(chunkHeader.fixedKeySize);
         if (key == keyOffsetPair.key){
             return keyOffsetPair.pos;
         } else if (key < keyOffsetPair.key){
@@ -42,24 +43,31 @@ std::optional<SSFile::offset> SSFile::findValueOffset(SSFile::offset chunkStart,
 }
 
 SSFile::KeyChunkHeader SSFile::moveToChunkForKey(const std::string &key) {
-    file.seekg(keyFooterStart);
+    file.seekg(header.keyFooterStart);
     auto chunkHeader = readKeyChunkHeader();
     /*
      * We are guaranteed to find a corresponding chunk, since we limit the max size of a key, and we make a
      * chunk that can fit keys up to the max size.
     */
-    while (key.size() > chunkHeader.getFixedKeySize()){
-        file.seekg(chunkHeader.getLength(), std::ios::cur);
+    while (key.size() > chunkHeader.fixedKeySize){
+        file.seekg(chunkHeader.length, std::ios::cur);
         chunkHeader = readKeyChunkHeader();
     }
 
     return chunkHeader;
 }
 
+SSFile::SSFileHeader SSFile::readSSFileHeader() {
+    SSFileHeader ssFileHeader{};
+    file.read(reinterpret_cast<char*>(&ssFileHeader), sizeof(ssFileHeader));
+    return ssFileHeader;
+}
+
+
 SSFile::KeyChunkHeader SSFile::readKeyChunkHeader() {
-    KeyChunkHeader header;
-    file.read(reinterpret_cast<char*>(&header), sizeof(header));
-    return header;
+    KeyChunkHeader keyChunkHeader{};
+    file.read(reinterpret_cast<char*>(&keyChunkHeader), sizeof(keyChunkHeader));
+    return keyChunkHeader;
 }
 
 SSFile::KeyOffsetPair SSFile::readKeyOffsetPair(size_t fixedKeySize) {
@@ -77,21 +85,19 @@ SSFile::KeyOffsetPair SSFile::readKeyOffsetPair(size_t fixedKeySize) {
 }
 
 SSFile::ValueHeader SSFile::readValueHeader() {
-    ValueHeader header;
-    file.read(reinterpret_cast<char*>(&header), sizeof(header));
-    return header;
+    ValueHeader valueHeader{};
+    file.read(reinterpret_cast<char*>(&valueHeader), sizeof(valueHeader));
+    return valueHeader;
 }
 
 DbValue SSFile::readValue() {
-    auto header = readValueHeader();
-    std::vector<char> data(header.dataLength, 0);
-    file.read(data.data(), header.dataLength);
-    return dbValueFromString(header.typeIndex, std::string(data.begin(), data.end()));
+    auto valueHeader = readValueHeader();
+    std::vector<char> data(valueHeader.dataLength, 0);
+    file.read(data.data(), valueHeader.dataLength);
+    return dbValueFromString(valueHeader.typeIndex, std::string(data.begin(), data.end()));
 }
 
 SSFile::ValueHeader::ValueHeader(uint32_t dataLength, DbValueTypeIndex typeIndex) : dataLength(dataLength), typeIndex(typeIndex) {}
-
-SSFile::ValueHeader::ValueHeader() : dataLength(0), typeIndex(0) {}
 
 bool SSFile::ValueHeader::isEntryRemoved() const {
     return dataLength == 0;
@@ -105,22 +111,22 @@ SSFile::KeyChunkHeader::KeyChunkHeader(uint32_t fixedKeySize, uint32_t chunkLeng
     }
 }
 
-SSFile::KeyChunkHeader::KeyChunkHeader() : fixedKeySize(0), length(0) {}
-
 size_t SSFile::KeyChunkHeader::keyOffsetPairLength() const {
     return fixedKeySize + sizeof(offset);
 }
 
-uint32_t SSFile::KeyChunkHeader::getFixedKeySize() const {
-    return fixedKeySize;
-}
-
-uint32_t SSFile::KeyChunkHeader::getLength() const {
-    return length;
-}
-
 size_t SSFile::KeyChunkHeader::getNumKeysInChunk() const {
+    if (length % keyOffsetPairLength() != 0){
+        throw std::runtime_error("Chunk malformed");
+    }
     return length / keyOffsetPairLength();
 }
 
 SSFile::KeyOffsetPair::KeyOffsetPair(std::string key, SSFile::offset pos) : key(std::move(key)), pos(pos) {}
+
+
+SSFile::SSFileHeader::SSFileHeader(uint32_t index, uint32_t hasBloomFilter, uint32_t bloomFilterLength,
+                                   uint32_t footerStart) : index(index), hasBloomFilter(hasBloomFilter),
+                                                           bloomFilterLength(bloomFilterLength),
+                                                           keyFooterStart(footerStart) {}
+

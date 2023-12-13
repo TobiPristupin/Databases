@@ -1,21 +1,21 @@
-#ifndef DATAINTENSIVE_AVLTREE_HPP
-#define DATAINTENSIVE_AVLTREE_HPP
+#ifndef DATAINTENSIVE_BST_HPP
+#define DATAINTENSIVE_BST_HPP
 
 #include <functional>
 #include "MemCache.h"
 
 template<class K, class V>
-class AvlTree : public MemCache<K, V> {
+class BST : public MemCache<K, V> {
 public:
 
-    AvlTree();
+    BST();
     std::optional<V> get(const K& k) const override;
     void insert(const K& k, const V& v) override;
     bool remove(const K& key) override;
     void traverseSorted(const std::function<void(const K& k, const V& v)>& callback) const override;
     size_t size() const override;
     void clear() override;
-    ~AvlTree() override;
+    ~BST() override;
 
     struct Node {
         explicit Node(K k, V v, Node* left=nullptr, Node *right=nullptr) : key(std::move(k)), value(std::move(v)), left(left), right(right) {};
@@ -35,10 +35,10 @@ private:
 };
 
 template<class K, class V>
-AvlTree<K, V>::AvlTree() : treeSize(0), root(std::nullopt) {}
+BST<K, V>::BST() : treeSize(0), root(std::nullopt) {}
 
 template<class K, class V>
-std::optional<V> AvlTree<K, V>::get(const K &k) const {
+std::optional<V> BST<K, V>::get(const K &k) const {
     auto node = findNode(k);
     if (node.has_value()){
         return node.value()->value;
@@ -48,7 +48,7 @@ std::optional<V> AvlTree<K, V>::get(const K &k) const {
 }
 
 template<class K, class V>
-void AvlTree<K, V>::insert(const K &k, const V &v) {
+void BST<K, V>::insert(const K &k, const V &v) {
     if (!root.has_value()){
         root = new Node(k, v);
         treeSize++;
@@ -81,7 +81,7 @@ void AvlTree<K, V>::insert(const K &k, const V &v) {
 }
 
 template<class K, class V>
-bool AvlTree<K, V>::remove(const K &key) {
+bool BST<K, V>::remove(const K &key) {
     auto node = findNode(key);
     if (!node.has_value()){
         return false;
@@ -100,7 +100,7 @@ bool AvlTree<K, V>::remove(const K &key) {
 
 
 template<class K, class V>
-void AvlTree<K, V>::traverseSorted(const std::function<void(const K &, const V &)> &callback) const {
+void BST<K, V>::traverseSorted(const std::function<void(const K &, const V &)> &callback) const {
     if (!root.has_value()){
         return;
     }
@@ -121,12 +121,12 @@ void AvlTree<K, V>::traverseSorted(const std::function<void(const K &, const V &
 }
 
 template<class K, class V>
-size_t AvlTree<K, V>::size() const {
+size_t BST<K, V>::size() const {
     return treeSize;
 }
 
 template<class K, class V>
-typename AvlTree<K,V>::Node *AvlTree<K, V>::removeRecursive(AvlTree::Node *curr, const K &key) {
+typename BST<K,V>::Node *BST<K, V>::removeRecursive(BST::Node *curr, const K &key) {
     if (curr->key < key){
         curr->right = removeRecursive(curr->right, key);
         return curr;
@@ -155,7 +155,7 @@ typename AvlTree<K,V>::Node *AvlTree<K, V>::removeRecursive(AvlTree::Node *curr,
 }
 
 template<class K, class V>
-void AvlTree<K, V>::clear() { //TODO
+void BST<K, V>::clear() { //TODO
     if (!root.has_value()){
         return;
     }
@@ -165,7 +165,7 @@ void AvlTree<K, V>::clear() { //TODO
 }
 
 template<class K, class V>
-std::optional<typename AvlTree<K,V>::Node*> AvlTree<K, V>::findNode(const K &k) const {
+std::optional<typename BST<K,V>::Node*> BST<K, V>::findNode(const K &k) const {
     if (!root.has_value()){
         return std::nullopt;
     }
@@ -185,7 +185,7 @@ std::optional<typename AvlTree<K,V>::Node*> AvlTree<K, V>::findNode(const K &k) 
 }
 
 template<class K, class V>
-typename AvlTree<K,V>::Node *AvlTree<K, V>::findSuccessor(AvlTree::Node *node) const {
+typename BST<K,V>::Node *BST<K, V>::findSuccessor(BST::Node *node) const {
     if (!node->right){
         throw std::runtime_error("Expected node to have right subtree");
     }
@@ -200,12 +200,12 @@ typename AvlTree<K,V>::Node *AvlTree<K, V>::findSuccessor(AvlTree::Node *node) c
 
 
 template<class K, class V>
-AvlTree<K, V>::~AvlTree() {
+BST<K, V>::~BST() {
     clear();
 }
 
 template<class K, class V>
-void AvlTree<K, V>::clearRecursive(AvlTree::Node *curr) { //TODO: Make iterative
+void BST<K, V>::clearRecursive(BST::Node *curr) { //TODO: Make iterative
     if (!curr){
         return;
     }
@@ -218,4 +218,4 @@ void AvlTree<K, V>::clearRecursive(AvlTree::Node *curr) { //TODO: Make iterative
     delete curr;
 }
 
-#endif //DATAINTENSIVE_AVLTREE_HPP
+#endif //DATAINTENSIVE_BST_HPP

@@ -9,19 +9,20 @@
 #include "MemCache.h"
 #include "SSFile.h"
 #include "DbMemCache.h"
+#include "SSTableParams.h"
 
 
 class SSFileCreator {
 public:
-    static std::unique_ptr<SSFile> newFile(const std::filesystem::path &directory, size_t index, const DbMemCache *memcache, const std::unordered_set<std::string>& tombstones);
+    static std::unique_ptr<SSFile> newFile(const std::filesystem::path &directory, size_t index, bool hasBloomFilter, uint32_t bloomFilterSize, const DbMemCache *memcache, const std::unordered_set<std::string>& tombstones);
     static std::unique_ptr<SSFile> loadFile(const std::filesystem::path &file);
     static bool isFilenameSSTable(const std::filesystem::path &path);
-    static size_t extractIndexFromFilename(const std::filesystem::path &path);
 
 private:
 
     using KeysBySize = std::map<size_t, std::vector<std::string>>;
     using offset = SSFile::offset;
+    using SSFileHeader = SSFile::SSFileHeader;
     using ValueHeader = SSFile::ValueHeader;
     using KeyChunkHeader = SSFile::KeyChunkHeader;
 
@@ -30,6 +31,8 @@ private:
     inline static const std::vector<size_t> chunkKeySizes = {8, 16, 32, 64, 128, 256, 512, maxKeySize};
     static_assert(maxKeySize > 512, "Max key size must be larger than the previous key chunk size. Adjust key chunk sizes if changing max key size.");
 
+    static offset writePlaceHolderSSFileHeader(std::fstream* stream);
+    static void modifySSFileHeader(std::fstream* stream, offset headerPos, const SSFileHeader &header);
     static offset writeToFile(std::fstream* stream, const DbMemCache *memcache, const std::unordered_set<std::string>& tombstones);
     static offset writeValue(std::fstream* stream, const ValueHeader &valueHeader, const DbValue& value);
     static offset writeValueHeader(std::fstream* stream, const ValueHeader &valueHeader);
@@ -40,9 +43,6 @@ private:
     static std::map<std::string, offset> writeValues(std::fstream *stream, const DbMemCache *memcache,
                                                      const std::unordered_set<std::string> &tombstones);
     static offset writeKeyChunks(std::fstream *stream, const KeysBySize &keysBySize, const std::map<std::string, offset> &valueoffsets);
-    static offset findFooterStart(std::fstream *stream, offset footerStart);
-    static offset findFooterSize(std::fstream *stream);
-    static offset fileSize(std::fstream *stream);
 };
 
 

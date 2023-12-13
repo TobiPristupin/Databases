@@ -5,8 +5,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
+add_compile_options(-Wno-dev)
 
-FetchContent_Declare(fmt
+FetchContent_Declare(
+        fmt
         GIT_REPOSITORY https://github.com/fmtlib/fmt.git
         GIT_TAG master
 )
@@ -16,8 +18,15 @@ FetchContent_Declare(
         URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
 )
 
+FetchContent_Declare(
+        googlebenchmark
+        GIT_REPOSITORY https://github.com/google/benchmark.git
+        GIT_TAG main)
+
+
 FetchContent_MakeAvailable(fmt)
 FetchContent_MakeAvailable(googletest)
+FetchContent_MakeAvailable(googlebenchmark)
 
 add_library(csv INTERFACE
         SSTableTesting/MemcacheTesting.cpp
@@ -36,10 +45,12 @@ set (SSTABLE_FILES
         SSTable/SSFileCreator.cpp
         SSTable/SSFileCreator.h
         SSTable/SSTableDb.cpp
-        SSTable/AvlTree.hpp
+        SSTable/BST.hpp
         SSTable/SSFile.cpp
         SSTable/SSFile.h
-        SSTable/DbMemCache.h)
+        SSTable/DbMemCache.h
+        SSTable/SortedMap.hpp
+        SSTable/SSTableParams.h)
 
 set (SHARED_FILES
         Workload.h
@@ -58,7 +69,8 @@ add_executable(Databases
 target_link_libraries(Databases
         PRIVATE
         fmt::fmt-header-only
-        csv)
+        csv
+        benchmark::benchmark)
 
 add_executable(scratchwork test.cpp)
 

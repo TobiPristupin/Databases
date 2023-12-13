@@ -9,8 +9,7 @@
 enum class Operation {
     GET,
     INSERT,
-    DELETE,
-    ENUM_COUNT
+    DELETE
 };
 
 struct Action {
@@ -25,7 +24,7 @@ struct Action {
 class WorkloadGenerator {
 
 public:
-    explicit WorkloadGenerator(unsigned long seed);
+    explicit WorkloadGenerator(unsigned long seed, size_t maxKeySize);
     /*
      * Example: If numActions = 1000 and expectedActionsPerKeyValue = 10, then that means that the
      * workload will generate 100 unique key-value pairs, and sample one at random 1000 times. That means
@@ -41,10 +40,13 @@ public:
      */
     std::vector<Action> generateCorrectRandomWorkload(size_t numActions, size_t expectedActionsPerKeyValue);
 
+    std::vector<Action> onlyInsertsWorkload(size_t numInserts);
+
     std::vector<std::pair<std::string, DbValue>> generateRandomKeyValues(size_t numPairs, size_t maxKeyLength);
 
 private:
     std::default_random_engine randomEngine;
+    size_t maxKeySize;
     Action generateRandomAction(const std::vector<std::pair<std::string, DbValue>> &keyValuePairs);
     Action generateCorrectRandomAction(const std::vector<std::pair<std::string, DbValue>> &keyValuePairs, std::map<std::string, bool> &inserted);
     std::string randomString(size_t length);

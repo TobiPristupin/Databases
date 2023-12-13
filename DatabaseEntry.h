@@ -13,8 +13,6 @@ constexpr int doubleType = 2;
 constexpr int boolType = 3;
 constexpr int stringType = 4;
 
-const size_t maxKeySize = 1024;
-
 std::string dbValueToString(const DbValue& value);
 DbValue dbValueFromString(DbValueTypeIndex typeIndex, const std::string &value);
 DbValue dbValueFromBytes(DbValueTypeIndex typeIndex, const char* data);

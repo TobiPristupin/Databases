@@ -10,7 +10,7 @@
 
 Action::Action(Operation operation, std::string key, DbValue value) : operation(operation), key(std::move(key)), value(std::move(value)) {}
 
-WorkloadGenerator::WorkloadGenerator(unsigned long seed) : randomEngine(seed) {}
+WorkloadGenerator::WorkloadGenerator(unsigned long seed, size_t maxKeySize) : randomEngine(seed), maxKeySize(maxKeySize) {}
 
 std::vector<Action> WorkloadGenerator::generateRandomWorkload(size_t numActions, size_t expectedActionsPerKeyValue) {
     size_t numKeyValuePairs = numActions / expectedActionsPerKeyValue;
@@ -34,6 +34,18 @@ WorkloadGenerator::generateCorrectRandomWorkload(size_t numActions, size_t expec
 
     while (actions.size() < numActions){
         actions.push_back(generateCorrectRandomAction(keyValues, inserted));
+    }
+
+    return actions;
+}
+
+std::vector<Action> WorkloadGenerator::onlyInsertsWorkload(size_t numInserts) {
+    std::vector<Action> actions;
+    actions.reserve(numInserts);
+    auto keyValues = generateRandomKeyValues(numInserts, maxKeySize);
+
+    for (auto const& keyValue : keyValues){
+        actions.emplace_back(Operation::INSERT, keyValue.first, keyValue.second);
     }
 
     return actions;
@@ -110,7 +122,14 @@ DbValue WorkloadGenerator::randomDbValue() {
 }
 
 Operation WorkloadGenerator::randomOperation() {
-    return Operation(randomBetween(0, static_cast<int>(Operation::ENUM_COUNT)-1));
+    double rand = randomBetween(0, 1);
+    if (rand <= 0.15){
+        return Operation::DELETE;
+    } else if (rand <= 0.3){
+        return Operation::GET;
+    } else {
+        return Operation::INSERT;
+    }
 }
 
 int WorkloadGenerator::randomBetween(int min, int max) {
@@ -132,6 +151,7 @@ bool WorkloadGenerator::validOperation(const Operation &operation, bool keyInser
 
     return true;
 }
+
 
 
 
