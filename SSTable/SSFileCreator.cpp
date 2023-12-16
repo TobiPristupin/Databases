@@ -20,12 +20,12 @@ std::unique_ptr<SSFile> SSFileCreator::newFile(const std::filesystem::path &dire
 }
 
 std::unique_ptr<SSFile> SSFileCreator::loadFile(const std::filesystem::path &file) {
-    //TODO: FIX
     if (!isFilenameSSTable(file)){
         throw std::runtime_error("File " + file.string() + " is not a valid SSTable file");
     }
 
     std::fstream stream;
+    stream.exceptions(std::ios::badbit | std::ios::failbit);
     stream.open(file, std::ios::in | std::ios::binary);
     return std::make_unique<SSFile>(std::move(stream));
 }

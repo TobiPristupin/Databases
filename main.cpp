@@ -5,6 +5,8 @@
 #include "LogDatabase/LogDatabase.h"
 #include "Workload.h"
 #include "SSTable/SSTableParams.h"
+#include "SSTable/BloomFilter.h"
+
 /*
  * Ideas for benchmarking
  *

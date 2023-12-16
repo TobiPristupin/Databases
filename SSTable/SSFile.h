@@ -8,6 +8,20 @@
 #include <optional>
 #include "../DatabaseEntry.h"
 
+/*
+ * Structure of an SSFile is as follows:
+ *
+ * SSFileHeader
+ * [Optional] bloomFilterBits
+ * Values
+ * [One or more] KeyChunk
+ *
+ * Where each KeyChunk is as follows:
+ *
+ * KeyChunkHeader
+ * [One or more] (Key, value offset) pairs
+ */
+
 class SSFile {
 public:
 

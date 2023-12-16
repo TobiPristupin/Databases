@@ -27,6 +27,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fmt)
 FetchContent_MakeAvailable(googletest)
 FetchContent_MakeAvailable(googlebenchmark)
+find_package(OpenSSL REQUIRED)
+
 
 add_library(csv INTERFACE
         SSTableTesting/MemcacheTesting.cpp
@@ -50,7 +52,9 @@ set (SSTABLE_FILES
         SSTable/SSFile.h
         SSTable/DbMemCache.h
         SSTable/SortedMap.hpp
-        SSTable/SSTableParams.h)
+        SSTable/SSTableParams.h
+        SSTable/BloomFilter.h
+        SSTable/BloomFilter.cpp)
 
 set (SHARED_FILES
         Workload.h
@@ -70,7 +74,8 @@ target_link_libraries(Databases
         PRIVATE
         fmt::fmt-header-only
         csv
-        benchmark::benchmark)
+        benchmark::benchmark
+        OpenSSL::SSL)
 
 add_executable(scratchwork test.cpp)
 
@@ -84,6 +89,7 @@ add_executable(
         SSTableTesting/MemcacheTesting.cpp
         SSTableTesting/TestUtils.cpp
         SSTableTesting/TestUtils.h
+        SSTableTesting/BloomFilterTesting.cpp
 )
 
 add_executable(
@@ -100,12 +106,19 @@ target_link_libraries(
         fmt::fmt-header-only
         GTest::gtest_main
         csv
+        OpenSSL::SSL
 )
 
 target_link_libraries(
         LogDatabaseTesting
         PRIVATE
         GTest::gtest_main
+)
+
+target_link_libraries(
+        scratchwork
+        PRIVATE
+        OpenSSL::SSL
 )
 
 include(GoogleTest)
