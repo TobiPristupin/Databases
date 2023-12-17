@@ -7,6 +7,7 @@
 #include <fstream>
 #include <optional>
 #include "../DatabaseEntry.h"
+#include "BloomFilter.h"
 
 /*
  * Structure of an SSFile is as follows:
@@ -22,24 +23,42 @@
  * [One or more] (Key, value offset) pairs
  */
 
+enum SSFileReadType {
+    KEY_FOUND, KEY_TOMBSTONE, KEY_NOT_FOUND
+};
+
+struct SSFileRead {
+    SSFileReadType type;
+    std::optional<DbValue> value;
+};
+
 class SSFile {
 public:
 
     using offset = std::streamoff;
 
+    SSFile(std::fstream file);
+    SSFileRead get(const std::string &key);
+    size_t getIndex() const;
+
+private:
+
     struct SSFileHeader {
         SSFileHeader() = default;
-        SSFileHeader(uint32_t index, uint32_t hasBloomFilter, uint32_t bloomFilterLength, uint32_t footerStart);
+        SSFileHeader(uint32_t index, uint32_t bloomFilterLength, uint32_t footerStart);
 
         uint32_t index;
-        uint32_t hasBloomFilter;
-        uint32_t bloomFilterLength;
+        uint32_t filterBits;
         uint32_t keyFooterStart;
+
+        bool hasBloomFilter() const;
+        size_t bloomFilterLength() const;
     };
 
     struct ValueHeader {
         ValueHeader() = default;
         ValueHeader(uint32_t dataLength, DbValueTypeIndex typeIndex);
+        static ValueHeader TombstoneHeader();
         bool isEntryRemoved() const;
 
         /*
@@ -74,23 +93,20 @@ public:
         offset pos;
     };
 
-    SSFile(std::fstream file);
-    std::optional<DbValue> get(const std::string &key);
-    size_t getIndex() const;
-
-private:
-
     std::fstream file;
     SSFileHeader header{};
+    std::optional<BloomFilter> bloomFilter;
 
     SSFileHeader readSSFileHeader();
+    BloomFilter readBloomFilter(uint32_t bloomFilterLength);
     KeyChunkHeader moveToChunkForKey(const std::string &key);
     KeyChunkHeader readKeyChunkHeader();
     std::optional<offset> findValueOffset(offset chunkStart, KeyChunkHeader chunkHeader, const std::string &key);
     KeyOffsetPair readKeyOffsetPair(size_t fixedKeySize);
-    DbValue readValue();
+    DbValue readValue(const ValueHeader &header);
     ValueHeader readValueHeader();
 
+    friend class SSFileCreator;
 };
 
 

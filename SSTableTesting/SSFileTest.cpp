@@ -9,7 +9,7 @@ protected:
     SSFileTest() {
         seed = time(nullptr);
         std::cout << "seed for reproducibility " << std::to_string(seed) << "\n";
-        workloadGenerator = std::make_unique<WorkloadGenerator>(seed, maxKeySize);
+        workloadGenerator = std::make_unique<WorkloadGenerator>(seed, SSTable::maxKeySize);
         initializeMemCache();
     }
 
@@ -29,15 +29,12 @@ protected:
 
 TEST_F(SSFileTest, testFileIndex){
     for (int index = 0; index < 10; index++){
-        auto ssFile = SSFileCreator::newFile(fileDirectory, index, false, 0, memCache.get(), {});
+        auto ssFile = SSFileCreator::newFile(fileDirectory, index, 0, memCache.get(), {});
         ASSERT_EQ(ssFile->getIndex(), index);
     }
 }
 
-TEST_F(SSFileTest, testCorrectnessNoBloomFilter) {
-    std::map<std::string, DbValue> mirror;
-    std::unordered_set<std::string> tombstones;
-    auto workload = workloadGenerator->generateRandomWorkload(5000, 20);
+static void populate(const std::vector<Action> &workload, std::map<std::string, DbValue> &mirror, std::set<std::string> &tombstones, DbMemCache* memCache){
     for (auto &action: workload) {
         switch (action.operation) {
             case Operation::INSERT:
@@ -54,13 +51,60 @@ TEST_F(SSFileTest, testCorrectnessNoBloomFilter) {
                 break;
         }
     }
+}
 
-    auto ssFile = SSFileCreator::newFile(fileDirectory, 0, false, 0, memCache.get(),tombstones);
-    for (auto const &keyVal: mirror) {
-        if (std::holds_alternative<double>(keyVal.second)) {
-            ASSERT_NEAR(std::get<double>(keyVal.second), std::get<double>(ssFile->get(keyVal.first).value()), 0.00001);
+TEST_F(SSFileTest, testNoFilter) {
+    std::map<std::string, DbValue> mirror;
+    std::set<std::string> tombstones;
+    auto workload = workloadGenerator->generateRandomWorkload(20000, 20);
+    populate(workload, mirror, tombstones, memCache.get());
+    auto ssFile = SSFileCreator::newFile(fileDirectory, 0, 0, memCache.get(), tombstones);
+    for (const auto& [key, val] : mirror) {
+        auto read = ssFile->get(key);
+        ASSERT_EQ(read.type, KEY_FOUND);
+        auto value = read.value.value();
+        if (std::holds_alternative<double>(val)) {
+            ASSERT_NEAR(std::get<double>(val), std::get<double>(value), 0.00001);
             continue;
         }
-        ASSERT_EQ(keyVal.second, ssFile->get(keyVal.first).value());
+
+        ASSERT_EQ(val, value);
+    }
+
+    for (const auto& key : tombstones){
+        ASSERT_EQ(ssFile->get(key).type, KEY_TOMBSTONE);
+    }
+
+    auto keyValuesNotInserted = workloadGenerator->generateRandomKeyValues(30, 256);
+    for (const auto& [key, val] : keyValuesNotInserted){
+        ASSERT_EQ(ssFile->get(key).type, KEY_NOT_FOUND);
+    }
+}
+
+TEST_F(SSFileTest, testFilter) {
+    std::map<std::string, DbValue> mirror;
+    std::set<std::string> tombstones;
+    auto workload = workloadGenerator->generateRandomWorkload(20000, 20);
+    populate(workload, mirror, tombstones, memCache.get());
+    auto ssFile = SSFileCreator::newFile(fileDirectory, 0, SSTable::bloomFilterBits, memCache.get(), tombstones);
+    for (const auto& [key, val] : mirror) {
+        auto read = ssFile->get(key);
+        ASSERT_EQ(read.type, KEY_FOUND);
+        auto value = read.value.value();
+        if (std::holds_alternative<double>(val)) {
+            ASSERT_NEAR(std::get<double>(val), std::get<double>(value), 0.00001);
+            continue;
+        }
+
+        ASSERT_EQ(val, value);
+    }
+
+    for (const auto& key : tombstones){
+        ASSERT_EQ(ssFile->get(key).type, KEY_TOMBSTONE);
+    }
+
+    auto keyValuesNotInserted = workloadGenerator->generateRandomKeyValues(30, 256);
+    for (const auto& [key, val] : keyValuesNotInserted){
+        ASSERT_EQ(ssFile->get(key).type, KEY_NOT_FOUND);
     }
 }

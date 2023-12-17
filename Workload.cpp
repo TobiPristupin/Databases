@@ -44,8 +44,8 @@ std::vector<Action> WorkloadGenerator::onlyInsertsWorkload(size_t numInserts) {
     actions.reserve(numInserts);
     auto keyValues = generateRandomKeyValues(numInserts, maxKeySize);
 
-    for (auto const& keyValue : keyValues){
-        actions.emplace_back(Operation::INSERT, keyValue.first, keyValue.second);
+    for (auto const& [key, val] : keyValues){
+        actions.emplace_back(Operation::INSERT, key, val);
     }
 
     return actions;
@@ -122,7 +122,7 @@ DbValue WorkloadGenerator::randomDbValue() {
 }
 
 Operation WorkloadGenerator::randomOperation() {
-    double rand = randomBetween(0, 1);
+    double rand = randomBetween(0.0, 1.0);
     if (rand <= 0.15){
         return Operation::DELETE;
     } else if (rand <= 0.3){

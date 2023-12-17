@@ -45,5 +45,5 @@ std::vector<unsigned long long> splitHash(const std::vector<std::uint8_t> &hash,
 }
 
 int main() {
-    splitHash(sha256("hello"), 3);
+    std::cout << (std::string("v") > std::string("O")) << "\n";
 }

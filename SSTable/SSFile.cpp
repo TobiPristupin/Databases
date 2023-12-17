@@ -4,18 +4,33 @@
 
 SSFile::SSFile(std::fstream file) : file(std::move(file)) {
     header = readSSFileHeader();
+    if (header.hasBloomFilter()){
+        bloomFilter = readBloomFilter(header.bloomFilterLength());
+    }
 }
 
-std::optional<DbValue> SSFile::get(const std::string &key) {
+SSFileRead SSFile::get(const std::string &key) {
+    if (bloomFilter.has_value()){
+        if (!bloomFilter.value().canContainKey(key)){
+            return {KEY_NOT_FOUND};
+        }
+    }
+
     auto chunkHeader = moveToChunkForKey(key);
     offset chunkStart = file.tellg();
     auto valueOffset = findValueOffset(chunkStart, chunkHeader, key);
     if (!valueOffset.has_value()){
-        return std::nullopt;
+        return {KEY_NOT_FOUND};
     }
 
     file.seekg(valueOffset.value());
-    return readValue();
+    auto valueHeader = readValueHeader();
+    if (valueHeader.isEntryRemoved()){
+        return {KEY_TOMBSTONE};
+    }
+
+    auto value =  readValue(valueHeader);
+    return {KEY_FOUND, value};
 }
 
 size_t SSFile::getIndex() const {
@@ -63,6 +78,11 @@ SSFile::SSFileHeader SSFile::readSSFileHeader() {
     return ssFileHeader;
 }
 
+BloomFilter SSFile::readBloomFilter(uint32_t bloomFilterLength) {
+    std::vector<uint8_t> bitset(bloomFilterLength);
+    file.read(reinterpret_cast<char*>(bitset.data()), bloomFilterLength);
+    return {SSTable::bloomFilterHashes, bitset};
+}
 
 SSFile::KeyChunkHeader SSFile::readKeyChunkHeader() {
     KeyChunkHeader keyChunkHeader{};
@@ -90,8 +110,7 @@ SSFile::ValueHeader SSFile::readValueHeader() {
     return valueHeader;
 }
 
-DbValue SSFile::readValue() {
-    auto valueHeader = readValueHeader();
+DbValue SSFile::readValue(const ValueHeader &valueHeader) {
     std::vector<char> data(valueHeader.dataLength, 0);
     file.read(data.data(), valueHeader.dataLength);
     return dbValueFromString(valueHeader.typeIndex, std::string(data.begin(), data.end()));
@@ -101,6 +120,9 @@ SSFile::ValueHeader::ValueHeader(uint32_t dataLength, DbValueTypeIndex typeIndex
 
 bool SSFile::ValueHeader::isEntryRemoved() const {
     return dataLength == 0;
+}
+SSFile::ValueHeader SSFile::ValueHeader::TombstoneHeader() {
+    return {0, 0};
 }
 
 SSFile::KeyChunkHeader::KeyChunkHeader(uint32_t fixedKeySize, uint32_t chunkLength)
@@ -125,8 +147,15 @@ size_t SSFile::KeyChunkHeader::getNumKeysInChunk() const {
 SSFile::KeyOffsetPair::KeyOffsetPair(std::string key, SSFile::offset pos) : key(std::move(key)), pos(pos) {}
 
 
-SSFile::SSFileHeader::SSFileHeader(uint32_t index, uint32_t hasBloomFilter, uint32_t bloomFilterLength,
-                                   uint32_t footerStart) : index(index), hasBloomFilter(hasBloomFilter),
-                                                           bloomFilterLength(bloomFilterLength),
+SSFile::SSFileHeader::SSFileHeader(uint32_t index, uint32_t bloomFilterLength,
+                                   uint32_t footerStart) : index(index),
+                                                           filterBits(bloomFilterLength),
                                                            keyFooterStart(footerStart) {}
 
+bool SSFile::SSFileHeader::hasBloomFilter() const {
+    return filterBits > 0;
+}
+
+size_t SSFile::SSFileHeader::bloomFilterLength() const {
+    return filterBits / sizeof(uint8_t);
+}

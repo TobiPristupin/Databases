@@ -2,7 +2,6 @@
 #define DATAINTENSIVE_SSTABLEDB_H
 
 #include <fstream>
-#include <unordered_set>
 #include "../DatabaseEntry.h"
 #include "MemCache.h"
 #include "BST.hpp"
@@ -20,7 +19,7 @@ public:
 private:
     std::filesystem::path baseDirectory;
     std::unique_ptr<DbMemCache> memcache;
-    std::unordered_set<std::string> tombstones;
+    std::set<std::string> tombstones;
     bool useBloomFilter;
     const std::filesystem::path writeAheadLogFilename = "write_ahead_log.csv";
     const std::filesystem::path ssTablesDirectory = "sstables";

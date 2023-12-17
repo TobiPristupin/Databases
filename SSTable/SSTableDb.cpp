@@ -39,14 +39,18 @@ std::optional<DbValue> SSTableDb::get(const std::string &key) {
     }
 
     for (auto it = ssTableFiles.rbegin(); it != ssTableFiles.rend(); it++){
-        auto value = (*it)->get(key);
-        if (value.has_value()){
-            return value.value();
+        auto read = (*it)->get(key);
+        switch (read.type) {
+            case KEY_FOUND:
+                return read.value.value();
+            case KEY_TOMBSTONE:
+                return std::nullopt;
+            case KEY_NOT_FOUND:
+                break;
         }
     }
 
     return std::nullopt;
-
 }
 
 void SSTableDb::remove(const std::string &key) {
@@ -61,7 +65,8 @@ void SSTableDb::flushMemcache() {
     }
 
     auto newIndex = ssTableFiles.size();
-    auto file = SSFileCreator::newFile(baseDirectory / ssTablesDirectory, newIndex, useBloomFilter, bloomFilterBits, memcache.get(), tombstones);
+    uint32_t filterBits = useBloomFilter ? SSTable::bloomFilterBits : 0;
+    auto file = SSFileCreator::newFile(baseDirectory / ssTablesDirectory, newIndex, filterBits, memcache.get(), tombstones);
     ssTableFiles.push_back(std::move(file));
     memcache->clear();
     clearWriteAheadLog();
@@ -72,7 +77,7 @@ SSTableDb::~SSTableDb() {
 }
 
 bool SSTableDb::shouldFlushMemcache() {
-    return memcache->size() > maxMemcacheSize;
+    return memcache->size() >= SSTable::maxMemcacheSize;
 }
 
 void SSTableDb::populateSSTables() {
@@ -147,8 +152,8 @@ void SSTableDb::validateKey(const std::string &key) {
         throw std::runtime_error("Cannot insert keys containing the '\\0' character. Attempted to insert key " + key);
     }
 
-    if (key.size() > maxKeySize){
-        throw std::runtime_error("Cannot insert keys with more than " + std::to_string(maxKeySize) + " characters.");
+    if (key.size() > SSTable::maxKeySize){
+        throw std::runtime_error("Cannot insert keys with more than " + std::to_string(SSTable::maxKeySize) + " characters.");
     }
 }
 

@@ -10,7 +10,7 @@ protected:
     BloomFilterTest() {
         seed = time(nullptr);
         std::cout << "seed for reproducibility " << std::to_string(seed) << "\n";
-        workloadGenerator = std::make_unique<WorkloadGenerator>(seed, maxKeySize);
+        workloadGenerator = std::make_unique<WorkloadGenerator>(seed, SSTable::maxKeySize);
         initializeMemCache();
     }
 
@@ -33,7 +33,7 @@ TEST_F(BloomFilterTest, testContainsInsertedKeys){
         memCache->insert(key, value);
     }
 
-    BloomFilter filter(3, memCache.get());
+    BloomFilter filter(3, 20000, memCache.get(), {});
     for (const auto& [key, value] : keysToInclude){
         ASSERT_TRUE(filter.canContainKey(key));
     }
@@ -46,7 +46,7 @@ TEST_F(BloomFilterTest, testFalsePositiveRate){
         memCache->insert(key, value);
     }
 
-    BloomFilter filter(3, memCache.get());
+    BloomFilter filter(3, 20000, memCache.get(), {});
     int falsePositives = 0;
     for (const auto& [key, value] : keysToExclude){
         falsePositives += filter.canContainKey(key);

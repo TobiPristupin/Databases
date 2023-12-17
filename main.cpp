@@ -106,9 +106,5 @@ BENCHMARK_MAIN();
 
 /*
  * TODO
- * If expected actions per key value is high, we end up deleting too much. Need to bias towards getting and inserting.
- *
- * Add SSfile header, read index from header instead of filename
- * add bloom filter
- *
+ * bloom filter test should be part of ssfiletesting not sstabletesting
  */

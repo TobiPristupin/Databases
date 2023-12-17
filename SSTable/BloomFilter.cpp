@@ -1,24 +1,31 @@
 #include "BloomFilter.h"
 #include <openssl/sha.h>
 #include <stdexcept>
+#include <utility>
 
-/*
- * Each elements key, hash it with the multiple hash functions
- */
-
-BloomFilter::BloomFilter(int numHashes, const DbMemCache *memCache) : numHashes(numHashes) {
+BloomFilter::BloomFilter(int numHashes, size_t numBits, const DbMemCache *memCache, const std::set<std::string> &tombstones) : numHashes(numHashes) {
+    bitset = std::vector<uint8_t>(numBits / byteSize, 0);
     memCache->traverseSorted([this](const auto& key, const auto& value){
        auto indices = getBitsetIndices(key);
        for (auto index : indices){
-           bitset.set(index);
+           setBit(index, true);
        }
     });
+
+    for (const auto &key : tombstones){
+        auto indices = getBitsetIndices(key);
+        for (auto index : indices){
+            setBit(index, true);
+        }
+    }
 }
 
-bool BloomFilter::canContainKey(const std::string &key) {
+BloomFilter::BloomFilter(int numHashes, std::vector<uint8_t> bitset) : numHashes(numHashes), bitset(std::move(bitset)) {}
+
+bool BloomFilter::canContainKey(const std::string &key) const {
     auto indices = getBitsetIndices(key);
     for (auto index : indices){
-        if (!bitset.test(index)){
+        if (!testBit(index)){
             return false;
         }
     }
@@ -72,4 +79,30 @@ std::vector<unsigned long long> BloomFilter::splitHash(const std::vector<std::ui
 
     return chunks;
 }
+
+std::vector<std::uint8_t> BloomFilter::getBitset() const {
+    return bitset;
+}
+
+void BloomFilter::setBit(size_t bit, bool set) {
+    if (bit / byteSize >= bitset.size()){
+        throw std::runtime_error("Bit too large");
+    }
+
+    if (set){
+        bitset[bit / byteSize] |= 1 << (bit % 8);
+    } else {
+        bitset[bit / byteSize] &= ~(1 << (bit % 8));
+    }
+}
+
+bool BloomFilter::testBit(size_t bit) const {
+    int byteSize = sizeof(decltype(bitset)::value_type);
+    if (bit / byteSize >= bitset.size()){
+        throw std::runtime_error("Bit too large");
+    }
+
+    return bitset[bit / byteSize] & (1 << (bit % 8));
+}
+
 

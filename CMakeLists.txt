@@ -90,6 +90,8 @@ add_executable(
         SSTableTesting/TestUtils.cpp
         SSTableTesting/TestUtils.h
         SSTableTesting/BloomFilterTesting.cpp
+        SSTableTesting/SSTableTesting.cpp
+        SSTableTesting/SSTableTesting.h
 )
 
 add_executable(
