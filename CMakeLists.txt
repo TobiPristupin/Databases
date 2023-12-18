@@ -31,44 +31,45 @@ find_package(OpenSSL REQUIRED)
 
 
 add_library(csv INTERFACE
-        SSTableTesting/MemcacheTesting.cpp
-        LogDatabaseTesting/LogDatabaseTest.cpp)
+        src/SSTableTesting/MemcacheTesting.cpp
+        src/LogDatabaseTesting/LogDatabaseTest.cpp)
 
 target_include_directories(csv INTERFACE lib/csv)
 
 set (LOG_DATABASE_FILES
-        LogDatabase/LogDatabaseGenerics.hpp
-        LogDatabase/LogDatabase.h
-        LogDatabase/LogDatabase.cpp)
+        src/LogDatabase/LogDatabaseGenerics.hpp
+        src/LogDatabase/LogDatabase.h
+        src/LogDatabase/LogDatabase.cpp)
 
 set (SSTABLE_FILES
-        SSTable/MemCache.h
-        SSTable/SSTableDb.h
-        SSTable/SSFileCreator.cpp
-        SSTable/SSFileCreator.h
-        SSTable/SSTableDb.cpp
-        SSTable/BST.hpp
-        SSTable/SSFile.cpp
-        SSTable/SSFile.h
-        SSTable/DbMemCache.h
-        SSTable/SortedMap.hpp
-        SSTable/SSTableParams.h
-        SSTable/BloomFilter.h
-        SSTable/BloomFilter.cpp)
+        src/SSTable/MemCache.h
+        src/SSTable/SSTableDb.h
+        src/SSTable/SSFileCreator.cpp
+        src/SSTable/SSFileCreator.h
+        src/SSTable/SSTableDb.cpp
+        src/SSTable/BST.hpp
+        src/SSTable/SSFile.cpp
+        src/SSTable/SSFile.h
+        src/SSTable/DbMemCache.h
+        src/SSTable/SortedMap.hpp
+        src/SSTable/SSTableParams.h
+        src/SSTable/BloomFilter.h
+        src/SSTable/BloomFilter.cpp)
 
 set (SHARED_FILES
-        Workload.h
-        Workload.cpp
-        DatabaseEntry.h
-        DatabaseEntry.cpp
+        src/Workload.h
+        src/Workload.cpp
+        src/DatabaseEntry.h
+        src/DatabaseEntry.cpp
+        src/KeyValueDb.h
 )
 
 add_executable(Databases
         ${LOG_DATABASE_FILES}
         ${SSTABLE_FILES}
         ${SHARED_FILES}
-        main.cpp
-        SSTable/DbMemCache.h)
+        src/main.cpp
+        src/SSTable/DbMemCache.h)
 
 target_link_libraries(Databases
         PRIVATE
@@ -85,20 +86,19 @@ add_executable(
         SSTableTesting
         ${SSTABLE_FILES}
         ${SHARED_FILES}
-        SSTableTesting/SSFileTest.cpp
-        SSTableTesting/MemcacheTesting.cpp
-        SSTableTesting/TestUtils.cpp
-        SSTableTesting/TestUtils.h
-        SSTableTesting/BloomFilterTesting.cpp
-        SSTableTesting/SSTableTesting.cpp
-        SSTableTesting/SSTableTesting.h
+        src/SSTableTesting/SSFileTest.cpp
+        src/SSTableTesting/MemcacheTesting.cpp
+        src/SSTableTesting/TestUtils.cpp
+        src/SSTableTesting/TestUtils.h
+        src/SSTableTesting/BloomFilterTesting.cpp
+        src/SSTableTesting/SSTableTesting.cpp
 )
 
 add_executable(
         LogDatabaseTesting
         ${LOG_DATABASE_FILES}
         ${SHARED_FILES}
-        LogDatabaseTesting/LogDatabaseTest.cpp
+        src/LogDatabaseTesting/LogDatabaseTest.cpp
 )
 
 
